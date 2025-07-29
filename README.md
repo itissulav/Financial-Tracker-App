@@ -24,14 +24,15 @@ A privacy-first personal finance tracker built with React Native and Expo. Log a
 
 ## 📸 Screenshots
 
-Dashboard
-![Screenshot](./assets/images/screenshots/Dashboard.jpeg)
+<h3>Dashboard</h3>
+<img src="./assets/images/screenshots/Dashboard.jpeg" alt="Dashboard" width="400"/>
 
-Transaction
-![Screenshot](./assets/images/screenshots/Transaction.jpeg)
+<h3>Transactions</h3>
+<img src="./assets/images/screenshots/Transaction.jpeg" alt="Transaction" width="400"/>
 
-Profile
-![Screenshot](./assets/images/screenshots/Profile.jpeg)
+<h3>Profile</h3>
+<img src="./assets/images/screenshots/Profile.jpeg" alt="Profile" width="400"/>
+
 ---
 
 ## 🚀 Getting Started
