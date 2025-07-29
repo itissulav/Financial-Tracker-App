@@ -1,75 +1,236 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import AddAccountModal from "@/components/AddAccountModal";
+import AddCard from "@/components/AddCard";
+import CardOptionsModal from "@/components/CardOptionsModal";
+import EditAccountModal from "@/components/EditAccountModal";
+import GraphDropdown from "@/components/GraphDropdown";
+import StorageCard from "@/components/StorageCard";
+import TotalCard from "@/components/TotalCard";
+import TransactionCard from "@/components/TransactionCard";
+import { initDatabase, resetDatabase } from "@/db";
+import { getAllAccounts } from "@/db/accounts";
+import {
+  getMonthlyExpenses,
+  getRecentTransactions,
+  MonthlyExpense,
+} from "@/db/transactions";
+import { Account, TransactionWithCategory } from "@/db/types";
+import { handleDelete, handleLongPress } from "@/utilities/accountActions";
+import { useEffect, useState } from "react";
+import {
+  Alert,
+  Dimensions,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { LineChart } from "react-native-chart-kit";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+export default function Index() {
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [recentTransactions, setRecentTransactions] =
+    useState<TransactionWithCategory[]>([]);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [editAccountModalVisible, setEditAccountModalVisible] =
+    useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+  const [optionsVisible, setOptionsVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [expenseByMonth, setExpenseByMonth] = useState<MonthlyExpense[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState<string | null>(null);
 
-export default function HomeScreen() {
+  const screenWidth = Dimensions.get("window").width;
+  const total = accounts.reduce((sum, acc) => sum + acc.balance, 0);
+
+  const fetchData = async () => {
+    await initDatabase();
+    const data = await getAllAccounts();
+    const recent = await getRecentTransactions();
+    const expenses = await getMonthlyExpenses();
+
+    setAccounts(data as Account[]);
+    setRecentTransactions(recent as TransactionWithCategory[]);
+    setExpenseByMonth(expenses as MonthlyExpense[]);
+  };
+
+  const formatMonth = (month: string) => {
+    const [year, monthNum] = month.split("-");
+    const date = new Date(Number(year), Number(monthNum) - 1);
+    return date.toLocaleString("default", { month: "short", year: "2-digit" });
+  };
+
+  const labels = expenseByMonth
+    .map((item) => formatMonth(item.month))
+    .filter((month) => !!month);
+
+  const values = expenseByMonth
+    .map((item) => Number(item.total_spent))
+    .filter((val) => !isNaN(val) && isFinite(val));
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await fetchData();
+    setRefreshing(false);
+  };
+
+  const handleReset = async () => {
+    await resetDatabase();
+    Alert.alert("Database Reset", "All data has been reset.");
+    fetchData();
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <SafeAreaView className="flex-1 bg-primary pb-8">
+      <ScrollView
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={["#AB8BFF"]}
+            tintColor="#AB8BFF"
+          />
+        }
+        className="flex-1 px-5"
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* Add New Account */}
+        <AddAccountModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          onSuccess={fetchData}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+
+        {/* Edit Account */}
+        <EditAccountModal
+          visible={editAccountModalVisible}
+          onClose={() => setEditAccountModalVisible(false)}
+          onSuccess={fetchData}
+          account={selectedAccount}
+        />
+
+        {/* Card Options */}
+        <CardOptionsModal
+          visible={optionsVisible}
+          onClose={() => setOptionsVisible(false)}
+          onEdit={() => {
+            setEditAccountModalVisible(true);
+            setOptionsVisible(false);
+          }}
+          onDelete={() =>
+            handleDelete(selectedAccount, setAccounts, setOptionsVisible)
+          }
+        />
+
+        {/* Header */}
+        <Text className="text-light-100 text-2xl font-bold mt-4 mb-2">
+          Your Balance
+        </Text>
+        <Text className="text-light-300 mb-6">
+          Track and manage all your accounts in one place.
+        </Text>
+
+        {/* Total Balance Card */}
+        <View className="items-center mb-6">
+          <TotalCard amount={total} />
+        </View>
+
+        {/* Storage Accounts */}
+        <View className="mb-8">
+          <Text className="text-light-200 text-lg font-semibold mb-3">
+            Storage Accounts
+          </Text>
+          <View className="flex-row justify-center gap-4 items-center flex-wrap">
+            {accounts.map((account) => (
+              <StorageCard
+                key={account.id}
+                account={account}
+                onLongPress={() =>
+                  handleLongPress(
+                    account,
+                    setSelectedAccount,
+                    setOptionsVisible
+                  )
+                }
+              />
+            ))}
+            <AddCard onPress={() => setModalVisible(true)} />
+          </View>
+        </View>
+
+        {/* Recent Transactions */}
+        <View className="mb-8">
+          <Text className="text-light-200 text-lg font-semibold mb-3">
+            Recent Transactions
+          </Text>
+          {recentTransactions.length > 0 ? (
+            <View className="bg-secondary rounded-xl p-4 space-y-4 shadow-md shadow-black/20">
+              {recentTransactions.map((recentTransaction) => (
+                <TransactionCard
+                  key={recentTransaction.id}
+                  recentTransaction={recentTransaction}
+                />
+              ))}
+            </View>
+          ) : (
+            <Text className="text-muted-100 italic">
+              No transactions found.
+            </Text>
+          )}
+        </View>
+
+        {/* Line Chart for Monthly Spending */}
+        <View>
+          <GraphDropdown
+            value={selectedPeriod}
+            setValue={setSelectedPeriod}
+          />
+          {labels.length > 0 && values.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-z-40">
+              <LineChart
+                data={{
+                  labels: labels,
+                  datasets: [{ data: values, strokeWidth: 2 }],
+                }}
+                width={Math.max(labels.length * 80, screenWidth)}
+                height={220}
+                chartConfig={{
+                  backgroundColor: "#0f0d23",
+                  backgroundGradientFrom: "#0f0d23",
+                  backgroundGradientTo: "#0f0d23",
+                  decimalPlaces: 0,
+                  color: (opacity = 1) => `rgba(171, 139, 255, ${opacity})`,
+                  labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+                }}
+                bezier
+                style={{
+                  borderRadius: 16,
+                  marginVertical: 8,
+                }}
+              />
+            </ScrollView>
+          ) : (
+            <Text className="text-muted-100 italic mt-2">
+              Not enough data to display chart.
+            </Text>
+          )}
+
+        </View>
+
+
+        {/* Reset Button */}
+        <TouchableOpacity
+          onPress={handleReset}
+          className="bg-error px-5 py-3 rounded-xl self-center"
+        >
+          <Text className="text-white font-semibold">Reset Database</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
-});
