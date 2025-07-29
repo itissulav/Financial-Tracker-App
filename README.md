@@ -24,8 +24,14 @@ A privacy-first personal finance tracker built with React Native and Expo. Log a
 
 ## 📸 Screenshots
 
-> _Coming soon_ – include screenshots of your main dashboard, transaction list, and graphs.
+Dashboard
+![Screenshot](./assets/images/screenshots/Dashboard.jpeg)
 
+Transaction
+![Screenshot](./assets/images/screenshots/Transaction.jpeg)
+
+Profile
+![Screenshot](./assets/images/screenshots/Profile.jpeg)
 ---
 
 ## 🚀 Getting Started
